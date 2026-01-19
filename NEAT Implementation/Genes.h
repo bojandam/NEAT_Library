@@ -29,17 +29,20 @@ namespace NEAT {
                 int id;
                 NodeType nodeType;
                 double bias;
+                Node(int id = 0, double bias = 0.5, NodeType nodeType = HIDDEN) : id(id), nodeType(nodeType), bias(bias) {}
             };
             struct Link
             {
                 int nodeInId;
                 int nodeOutId;
+                Link(int nodeInId = 0, int nodeOutId = 0) :nodeInId(nodeInId), nodeOutId(nodeOutId) {}
             };
             struct Connection {
                 Link link;
                 double weight;
                 bool isEnabled;
                 int innovationNumber;
+                Connection(Link link = {}, double weight = 0, bool isEnabled = true, int innovationNumber = 0) :link(link), weight(weight), isEnabled(isEnabled), innovationNumber(innovationNumber) {}
             };
 
 
@@ -62,36 +65,64 @@ namespace NEAT {
 
         int nodeIdCounter = 0;
         int innovationCounter = 0;
-        std::set<Genome::Link> innovationTracker;
 
+
+        std::map<Genome::Link, int> innovationTracker_AddedConnections;
+        std::map<Genome::Link, int> innovationTracker_AddedNode;// [old_link]=nodeId
 
         Genome Mutate_ChangeConnectionWeight(Genome Parent) {
-            std::uniform_int_distribution<int> connectionSelector(0, Parent.connections.size());
-            Parent.connections[connectionSelector(rnd)].weight = weightDistribution(rnd);
+            std::uniform_int_distribution<int> connection_selector(0, Parent.connections.size());
+            Parent.connections[connection_selector(rnd)].weight = weightDistribution(rnd);
             return Parent;
         }
         Genome Mutate_ChangeNodeBias(Genome Parent) {
-            std::uniform_int_distribution<int> nodeSelector(0, Parent.nodes.size());
-            Parent.nodes[nodeSelector(rnd)].bias = weightDistribution(rnd);
+            std::uniform_int_distribution<int> node_selector(0, Parent.nodes.size());
+            Parent.nodes[node_selector(rnd)].bias = weightDistribution(rnd);
             return Parent;
         }
-        Genome Mutate_AddNode(Genome Parent) {
-            std::uniform_int_distribution<int> connectionSelector(0, Parent.connections.size());
-            int connectonIndex = connectionSelector(rnd);
-            while (!Parent.connections[connectonIndex].isEnabled)//is this a good idea
-                connectonIndex = connectionSelector(rnd);
 
-            Parent.connections[connectonIndex].isEnabled = false;
-            int newNodeId = nodeIdCounter++; // to do: Will this be affected by innovation tracking per generation, and will inovation tracking be per generation
+        Genome Mutate_AddNode(Genome Parent) {
+            std::uniform_int_distribution<int> connection_selector(0, Parent.connections.size());
+
+            int connecton_index = connection_selector(rnd);
+
+            while (!Parent.connections[connecton_index].isEnabled)//is this a good idea-----This will fail at the start when the NN is empty
+                connecton_index = connection_selector(rnd);
+
+            Genome::Link old_link = Parent.connections[connecton_index].link;
+
+            int new_node_id;
+            int innov_from;
+            int innov_to;
+
+            if (innovationTracker_AddedNode.find(old_link) != innovationTracker_AddedNode.end()) {
+                new_node_id = innovationTracker_AddedNode[old_link];
+                innov_from = innovationTracker_AddedConnections[{old_link.nodeInId, new_node_id}];
+                innov_to = innovationTracker_AddedConnections[{new_node_id, old_link.nodeOutId}];
+            }
+            else {
+                new_node_id = innovationTracker_AddedNode[old_link] = nodeIdCounter++;
+                innov_from = innovationTracker_AddedConnections[{old_link.nodeInId, new_node_id}] = innovationCounter++;
+                innov_to = innovationTracker_AddedConnections[{new_node_id, old_link.nodeOutId}] = innovationCounter++;
+            }
+            Genome::Node new_Node(new_node_id, weightDistribution(rnd), Genome::Node::HIDDEN);
+            Genome::Connection new_connection_From({ old_link.nodeInId, new_node_id }, 1.0, true, innov_from);
+            Genome::Connection new_connection_To({ new_node_id, old_link.nodeOutId }, Parent.connections[connecton_index].weight, true, innov_to);
+
+            Parent.connections[connecton_index].isEnabled = false;
+            Parent.nodes.push_back(new_Node);
+            Parent.connections.push_back(new_connection_From);
+            Parent.connections.push_back(new_connection_To);
 
         }
+
         Genome Mutate_AddConnection(Genome Parent) {
-            std::uniform_int_distribution<int> nodeSelector(0, Parent.nodes.size());
-            Genome::Link newLink{ Parent.nodes[nodeSelector(rnd)].id, Parent.nodes[nodeSelector(rnd)].id };
+            std::uniform_int_distribution<int> node_selector(0, Parent.nodes.size());
+            Genome::Link newLink{ Parent.nodes[node_selector(rnd)].id, Parent.nodes[node_selector(rnd)].id };
             while (Parent.link_would_create_loop(newLink)) // to do: Is while ok, or should it just fail if it would create a loop
             {
-                newLink.nodeInId = Parent.nodes[nodeSelector(rnd)].id;
-                newLink.nodeOutId = Parent.nodes[nodeSelector(rnd)].id;
+                newLink.nodeInId = Parent.nodes[node_selector(rnd)].id;
+                newLink.nodeOutId = Parent.nodes[node_selector(rnd)].id;
             }
         }
 
