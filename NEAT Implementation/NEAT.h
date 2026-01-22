@@ -33,11 +33,13 @@ namespace NEAT {
             double weight;
             bool isEnabled;
             uint innovationNumber;
-            Connection(Link link = {}, double weight = 0, bool isEnabled = true, uint innovationNumber = 0) :link(link), weight(weight), isEnabled(isEnabled), innovationNumber(innovationNumber) {}
+            Connection(Link link = {}, double weight = 0, bool isEnabled = true, uint innovationNumber = 0)
+                :link(link), weight(weight), isEnabled(isEnabled), innovationNumber(innovationNumber) {
+            }
         };
     public:
         std::vector<Node> nodes;
-        std::map<int, std::vector<Connection>> connections_AdjList;
+        std::map<int, std::vector<Connection>> connections_AdjList;//[i]:-> connections that start at nodes[i]
         uint numberOfInputs;
         uint numberOfOutputs;
 
@@ -60,34 +62,32 @@ namespace NEAT {
         }
 
         bool link_would_create_loop(Link newLink);
-    private:
-
     };
+
     struct Phenotype
     {
         Phenotype(const Genome &);
         std::vector<double> Predict(std::vector<double> input) const;
     };
 
-
-
     class NEAT {
     protected:
-        std::uniform_real_distribution<double> weightDistribution;
-        std::uniform_real_distribution<double> nodeDistribution;
+        std::uniform_real_distribution<double> weightDistribution; //range of values weights can be
+        std::uniform_real_distribution<double> nodeDistribution; //range of values nodes can have
         std::random_device rnd;
 
         uint nodeIdCounter;
         uint innovationCounter = 0;
 
-        std::map<Genome::Link, int> innovationTracker_AddedConnections;
-        std::map<Genome::Link, int> innovationTracker_AddedNode;// [old_link]=nodeId
+        // maps used to keep track of innovation on a gennerational level so duplicate innovations get the same innovation number
+        std::map<Genome::Link, int> innovationTracker_AddedConnections;//[newLink]->newLinks inovation id
+        std::map<Genome::Link, int> innovationTracker_AddedNode;// [link that got replased]-> Id of the new node 
+        //ex: (1->4) :-> (1->6),(6->4):  AddedNode[(1->4)]=6,  AddedConnections[(1->6) or (6->4)] = it's innovation id
 
         uint numOfInputsInNN;
         uint numOfOutputsInNN;
         uint generationSize;
 
-        std::allocator<Genome> StartingPopulationAllocator;
     public:
         NEAT(uint numOfInputsInNN, uint numOfOutputsInNN, uint generationSize = 1000) :weightDistribution(-1, 1), nodeDistribution(0, 1),
             numOfInputsInNN(numOfInputsInNN), numOfOutputsInNN(numOfOutputsInNN), generationSize(generationSize) {
@@ -123,6 +123,7 @@ namespace NEAT {
             }
 
             //Selection
+                //How do we make this customisable
 
             //Crossover
 
@@ -132,7 +133,7 @@ namespace NEAT {
 
             itterationsFinished++;
         } while (!TermanateCondition(GenerationFitness, itterationsFinished));
-
+        //Termanation
 
     }
     bool Genome::link_would_create_loop(Link newLink)
