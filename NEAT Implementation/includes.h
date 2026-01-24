@@ -4,7 +4,8 @@
 #include<set>
 #include<map>
 #include<cmath>
-#include<random> 
+#include<random>
+#include<algorithm>
 
 namespace NEAT {
     namespace StandardActivationFunctions {
