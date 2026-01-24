@@ -28,14 +28,14 @@ namespace NEAT {
         };
     public:
         std::vector<Node> nodes;
-        std::map<int, std::vector<Connection>> connections_AdjList;//[i]:-> connections that start at nodes[i]
+        std::vector<Connection> connections;
         uint numberOfInputs;
         uint numberOfOutputs;
 
         Genome(uint numberOfInputs,
             uint numberOfOutputs,
             std::uniform_real_distribution<double> & biasDistribution,
-            std::random_device & rnd,
+            std::mt19937 & rnd,
             const std::vector<Connection> & Connections = {});
 
         bool link_would_create_loop(Link newLink);
@@ -43,7 +43,7 @@ namespace NEAT {
 
 
     Genome::Genome(uint numberOfInputs, uint numberOfOutputs, std::uniform_real_distribution<double> & biasDistribution,
-        std::random_device & rnd, const std::vector<Connection> & Connections = {})
+        std::mt19937 & rnd, const std::vector<Connection> & connections = {})
         : numberOfInputs(numberOfInputs), numberOfOutputs(numberOfOutputs)
     {
         for (uint i = 0; i < numberOfInputs; i++) {
@@ -53,26 +53,11 @@ namespace NEAT {
             nodes.push_back(Node(i, biasDistribution(rnd), Node::OUTPUT));
         }
         int number_of_nodes = nodes.size();
-        for (const Connection & connection : Connections) {
+        for (const Connection & connection : connections) {
             if (connection.link.nodeInId < number_of_nodes && connection.link.nodeOutId < number_of_nodes) {
-                this->connections_AdjList[connection.link.nodeInId].push_back(connection);
+                this->connections.push_back(connection);
             }
         }
     }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 }
 #endif
