@@ -1,6 +1,6 @@
 #ifndef NEAT_LIBRARY_GENES_H
 #define NEAT_LIBRARY_GENES_H
-#include"includes.h"
+#include"includes.hpp"
 
 namespace NEAT {
     struct Genome

@@ -1,6 +1,6 @@
 #ifndef NEAT_LIBRARY_PHENOTYPE_H
 #define NEAT_LIBRARY_PHENOTYPE_H
-#include"genome.h"
+#include"genome.hpp"
 
 namespace NEAT
 {

@@ -1,10 +1,10 @@
 #ifndef NEAT_LIBRARY_NEAT_H
 #define NEAT_LIBRARY_NEAT_H
 
-#include "includes.h" 
-#include "genome.h"
-#include "phenotype.h"
-#include "individual.h"
+#include "includes.hpp" 
+#include "genome.hpp"
+#include "phenotype.hpp"
+#include "individual.hpp"
 namespace NEAT {
     class NEAT {
     protected:
