@@ -36,14 +36,14 @@ namespace NEAT {
             uint numberOfOutputs,
             std::uniform_real_distribution<double> & biasDistribution,
             std::mt19937 & rnd,
-            const std::vector<Connection> & Connections = {});
+            const std::vector<Connection> & connections = {});
 
         bool link_would_create_loop(Link newLink);
     };
 
 
     Genome::Genome(uint numberOfInputs, uint numberOfOutputs, std::uniform_real_distribution<double> & biasDistribution,
-        std::mt19937 & rnd, const std::vector<Connection> & connections = {})
+        std::mt19937 & rnd, const std::vector<Connection> & connections)
         : numberOfInputs(numberOfInputs), numberOfOutputs(numberOfOutputs)
     {
         for (uint i = 0; i < numberOfInputs; i++) {
