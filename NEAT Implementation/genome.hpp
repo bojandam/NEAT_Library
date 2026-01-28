@@ -99,13 +99,14 @@ namespace NEAT {
                 return true;
         adjList[From].push_back(To);
 
-        std::vector<bool> visited(nodes.size(), false), inPath(nodes.size(), false);
-        std::stack<uint> Stack;
+        std::vector<bool> visited(nodes.size(), false), inPathDefault(nodes.size(), false);
+        std::stack<std::pair<uint, std::vector<bool>>> Stack;
         for (uint i = 0; i < numberOfInputs; i++)
-            Stack.push(i);
+            Stack.push({ i,inPathDefault });
         while (!Stack.empty())
         {
-            uint curNode = Stack.top();
+            uint curNode = Stack.top().first;
+            std::vector<bool> inPath = Stack.top().second;
             Stack.pop();
             visited[curNode] = true;
             inPath[curNode] = true;
@@ -115,10 +116,9 @@ namespace NEAT {
                     return true;
                 if (!visited[neighbour]) {
                     visited[neighbour] = true;
-                    Stack.push(neighbour);
+                    Stack.push({ neighbour,inPath });
                 }
             }
-            inPath[curNode] = false;
         }
         return false;
     }
