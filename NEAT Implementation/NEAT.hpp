@@ -11,10 +11,12 @@ namespace NEAT {
     class NEAT {
     private:
         template<typename T> T choose_between(T optionA, T optionB);
+        template<typename T> T & choose_within(std::vector<T> options);
+
         template<typename T> void CrossoverVector(const std::vector<T> & fitter, const std::vector<T> & lessFit, std::vector<T> & childVector, uint(*getId)(const T & v));
     protected:
         std::uniform_real_distribution<double> weightDistribution; //range of values weights can be
-        std::uniform_real_distribution<double> nodeDistribution; //range of values nodes can have
+        std::uniform_real_distribution<double> nodeDistribution; //range of values nodes can have (what?)
         std::mt19937 rnd;
 
         uint nodeIdCounter;
@@ -37,7 +39,7 @@ namespace NEAT {
         uint compatibilityMinNThreshold = 20;
         double compatibilityTreshold = 3.0;
 
-        //
+        //Mutation Coefficients
         double weightMutationPerWeightProbability = 0.03;
         double biasMutationPerNodeProbability = 0.03;
         double addNodeMutationProbability = 0.1;
@@ -52,7 +54,8 @@ namespace NEAT {
         NEAT(uint numOfInputsInNN, uint numOfOutputsInNN, uint generationSize = 1000) :
             weightDistribution(-1, 1), nodeDistribution(0, 1), deltaNudgeDistribution(),
             numOfInputsInNN(numOfInputsInNN), numOfOutputsInNN(numOfOutputsInNN), generationSize(generationSize),
-            rnd(std::random_device{}()), individualSelector(0, generationSize - 1) {
+            rnd(std::random_device{}()), individualSelector(0, generationSize - 1)
+        {
             nodeIdCounter = numOfInputsInNN + numOfOutputsInNN;
         }
         std::vector<Genome>  RunAlgorithm(double (*FitnessFunction)(const Phenotype &),
@@ -87,6 +90,8 @@ namespace NEAT {
         uint itterationsFinished = 0;
         do {
             GenerationFitness.clear();
+            innovationTracker_AddedConnections.clear();
+            innovationTracker_AddedNode.clear();
             //2.Calculate Fitness and Speciate
             std::vector<Individual * > GenerationIndividuals;
             for (Genome & genome : Generation) {
@@ -172,7 +177,10 @@ namespace NEAT {
         static std::uniform_int_distribution<int> YesNoRange(0, 1);
         return (YesNoRange(rnd) ? A : B);
     }
-
+    template<typename T> T & NEAT::choose_within(std::vector<T> options) {
+        std::uniform_int_distribution<uint> SelectionRange(0, options.size());
+        return options[SelectionRange(rnd)];
+    }
     template<typename T> void NEAT::CrossoverVector(const std::vector<T> & fitter, const std::vector<T> & lessFit, std::vector<T> & childVector, uint(*getId)(const T & v)) {
         typename std::vector<T>::const_iterator i = fitter.begin(), j = lessFit.begin();
         while (i != fitter.end() && j != lessFit.end()) {
@@ -208,5 +216,44 @@ namespace NEAT {
         );
         return child;
     }
+
+    void NEAT::MutateAddNode(Genome & child) {
+        if (child.connections.empty())
+            return;
+
+        Genome::Connection & oldConnection = choose_within(child.connections);
+        const Genome::Link & oldLink = oldConnection.link;
+
+        auto it = innovationTracker_AddedNode.find(oldLink);
+        int NodeId = (it == innovationTracker_AddedNode.end() ? (innovationTracker_AddedNode[oldLink] = nodeIdCounter++) : it->second);
+
+        Genome::Link linkTo(oldLink.nodeInId, NodeId), linkFrom(NodeId, oldLink.nodeOutId);
+
+        if (it == innovationTracker_AddedNode.end()) {
+            innovationTracker_AddedConnections[linkTo] = innovationCounter++;
+            innovationTracker_AddedConnections[linkFrom] = innovationCounter++;
+        }
+        Genome::Connection new_connection_To(linkTo, 1.0, true, innovationTracker_AddedConnections[linkTo]);
+        Genome::Connection new_connection_From(linkFrom, oldConnection.weight, true, innovationTracker_AddedConnections[linkFrom]);
+
+        oldConnection.isEnabled = false;
+        child.nodes.push_back(Genome::Node(NodeId, weightDistribution(rnd)));
+        child.connections.push_back(new_connection_From);
+        child.connections.push_back(new_connection_To);
+    }
+
+    void NEAT::MutateAddConnection(Genome & child) {
+        Genome::Node & fromNode = choose_within(child.nodes);
+        Genome::Node & toNode = choose_within(child.nodes);
+        Genome::Link newLink(fromNode.id, toNode.id);
+        if (child.link_would_create_loop(newLink))
+            return;
+        if (innovationTracker_AddedConnections.find(newLink) == innovationTracker_AddedConnections.end())
+            innovationTracker_AddedConnections[newLink] = innovationCounter++;
+        child.connections.push_back({ newLink, weightDistribution(rnd), true, innovationTracker_AddedConnections[newLink] });
+    }
+
+
+
 }
 #endif  
