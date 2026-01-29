@@ -40,16 +40,21 @@ namespace NEAT {
         double compatibilityTreshold = 3.0;
 
         //Mutation Coefficients
-        double weightMutationPerWeightProbability = 0.03;
-        double biasMutationPerNodeProbability = 0.03;
-        double addNodeMutationProbability = 0.1;
-        double addConnectionMutationProbability = 0.1;
+        double weightMutation_PerWeight_Probability = 0.03;
+        double biasMutation_PerNode_Probability = 0.03;
+        double addNodeMutation_Probability = 0.1;
+        double addConnectionMutation_Probability = 0.1;
+        double mutationRandomToNudgeRatio = 0.5;
+        double mutationNudgeCap = 0.25;
         std::normal_distribution<double> deltaNudgeDistribution;
 
         double CalculateCompatibility(const Genome & A, const Genome & B);
-        void MutateWeight(double & w);
+        void MutateWeightNudge(double & w);
+        void MutateWeightRandom(double & w);
         void MutateAddNode(Genome & child);
         void MutateAddConnection(Genome & child);
+        Genome Crossover(const Individual & fitter, const Individual & lessFit);
+        void Mutate(Genome & child);
     public:
         NEAT(uint numOfInputsInNN, uint numOfOutputsInNN, uint generationSize = 1000) :
             weightDistribution(-1, 1), nodeDistribution(0, 1), deltaNudgeDistribution(),
@@ -63,8 +68,7 @@ namespace NEAT {
             double selectionRate,
             const std::vector<Genome::Link> & StarterLinks = {});
 
-        Genome Crossover(const Individual & fitter, const Individual & lessFit);
-        void Mutate(Genome & child);
+
     };
 
 
@@ -82,36 +86,40 @@ namespace NEAT {
         std::vector<Genome::Connection> StarterConnections;
         for (Genome::Link link : StarterLinks)
             StarterConnections.push_back(Genome::Connection(link, weightDistribution(rnd), true, innovationCounter++));
-
+        //utils definition
         std::vector<Genome> Generation(generationSize, Genome(numOfInputsInNN, numOfOutputsInNN, weightDistribution, rnd, StarterConnections));
         std::vector<Species> SpeciesTracker;
         std::vector<double> GenerationFitness;
 
         uint itterationsFinished = 0;
         do {
+            //prepare utils
             GenerationFitness.clear();
             innovationTracker_AddedConnections.clear();
             innovationTracker_AddedNode.clear();
             //2.Calculate Fitness and Speciate
-            std::vector<Individual * > GenerationIndividuals;
-            for (Genome & genome : Generation) {
-                double genomeFitness = FitnessFunction(std::move(Phenotype(genome)));
-                Individual individual(std::move(genome), genomeFitness);
-
-                bool added = false;
+            for (Genome & genome : Generation)
+            {
+                double genomeFitness = FitnessFunction(Phenotype(genome));  // calculate Fitness
+                Individual individual(std::move(genome), genomeFitness);    // genome -> individual 
+                //Speciation
+                bool joinedSpecie = false;
                 for (Species & specie : SpeciesTracker) {
-                    if (CalculateCompatibility(individual.genome, specie.representitive.genome) < compatibilityTreshold) {
-                        specie.members.push_back(std::move(individual));
-                        added = true;
+                    if (CalculateCompatibility(individual.genome, specie.representitive.genome) < compatibilityTreshold) // check if individual fits in specie
+                    {
+                        specie.members.push_back(std::move(individual)); // individuals get moved to spiciation tracker (/table/organiser) 
+                        joinedSpecie = true;
                         break;
                     }
                 }
-                if (!added) {
-                    SpeciesTracker.push_back(Species(std::move(individual)));
+                if (!joinedSpecie) {
+                    SpeciesTracker.push_back(Species(std::move(individual)));//make a new specie
                 }
                 GenerationFitness.push_back(genomeFitness);
-            }//!!! Generation is unusable now
+            }
+            Generation.clear();// just in case (since all genomes are now in Spicies tracker)
             //3.Selection
+            std::vector<Individual * > GenerationIndividuals;
             for (Species & spicie : SpeciesTracker) {
                 for (Individual & individual : spicie.members) {
                     individual.fitness /= spicie.members.size(); //updated fitnes using speciation
@@ -119,7 +127,7 @@ namespace NEAT {
                 }
             }
             std::sort(GenerationIndividuals.begin(), GenerationIndividuals.end(), [](Individual * a, Individual * b) {return *a < *b; });
-            //Crossover & Mutation
+            //4.Crossover & Mutation
             std::vector<Genome> NextGeneration;
             while (NextGeneration.size() < generationSize)
             {
@@ -133,6 +141,7 @@ namespace NEAT {
                     NextGeneration.push_back(std::move(child));
                 }
             }
+            //Prepare for next Loop
             Generation = std::move(NextGeneration);
             for (Species & specie : SpeciesTracker)
                 specie.PrepareForNextGeneration();
@@ -208,11 +217,11 @@ namespace NEAT {
             [](const Genome::Connection & v) {return v.innovationNumber; }
         );
 
-        CrossoverVector<Genome::Node>(
+        CrossoverVector<Node>(
             fitter.genome.nodes,
             lessFit.genome.nodes,
             child.nodes,
-            [](const Genome::Node & v) {return v.id; }
+            [](const Node & v) {return v.id; }
         );
         return child;
     }
@@ -237,14 +246,14 @@ namespace NEAT {
         Genome::Connection new_connection_From(linkFrom, oldConnection.weight, true, innovationTracker_AddedConnections[linkFrom]);
 
         oldConnection.isEnabled = false;
-        child.nodes.push_back(Genome::Node(NodeId, weightDistribution(rnd)));
+        child.nodes.push_back(Node(NodeId, weightDistribution(rnd)));
         child.connections.push_back(new_connection_From);
         child.connections.push_back(new_connection_To);
     }
 
     void NEAT::MutateAddConnection(Genome & child) {
-        Genome::Node & fromNode = choose_within(child.nodes);
-        Genome::Node & toNode = choose_within(child.nodes);
+        Node & fromNode = choose_within(child.nodes);
+        Node & toNode = choose_within(child.nodes);
         Genome::Link newLink(fromNode.id, toNode.id);
         if (child.link_would_create_loop(newLink))
             return;
@@ -253,7 +262,34 @@ namespace NEAT {
         child.connections.push_back({ newLink, weightDistribution(rnd), true, innovationTracker_AddedConnections[newLink] });
     }
 
+    void NEAT::MutateWeightNudge(double & w)
+    {
+        w = std::clamp<double>(w + std::clamp<double>(deltaNudgeDistribution(rnd), -mutationNudgeCap, mutationNudgeCap), weightDistribution.min(), weightDistribution.max());
+    }
 
+    void NEAT::MutateWeightRandom(double & w)
+    {
+        w = weightDistribution(rnd);
+    }
+
+    void NEAT::Mutate(Genome & child)
+    {
+        static std::uniform_real_distribution<double> decider(0, 1);
+
+        if (decider(rnd) <= addConnectionMutation_Probability)
+            MutateAddConnection(child);
+        if (decider(rnd) <= addNodeMutation_Probability)
+            MutateAddConnection(child);
+        for (Node & node : child.nodes) {
+            if (decider(rnd) <= biasMutation_PerNode_Probability)
+                (decider(rnd) <= mutationRandomToNudgeRatio) ? MutateWeightRandom(node.bias) : MutateWeightNudge(node.bias);
+        }
+        for (Genome::Connection & connection : child.connections) {
+            if (decider(rnd) <= weightMutation_PerWeight_Probability)
+                (decider(rnd) <= mutationRandomToNudgeRatio) ? MutateWeightRandom(connection.weight) : MutateWeightNudge(connection.weight);
+        }
+
+    }
 
 }
 #endif  
