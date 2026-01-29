@@ -30,17 +30,34 @@ namespace NEAT {
                 }
             }
         }
+        std::reverse(result.begin(), result.end());
         return result;
     }
 
 
-    Phenotype::Phenotype(const Genome & genotype) : AdjList(genotype.generateAdjList()), nodes(genotype.nodes),
-        numberOfInputs(genotype.numberOfInputs), numberOfOutputs(genotype.numberOfOutputs), nodeCalculationOrder(topologicalSort(AdjList, nodes.size(), numberOfInputs))
+    Phenotype::Phenotype(const Genome & genotype, ActivationFunction activationFunction) :
+        AdjList(genotype.generateAdjList()),
+        nodes(genotype.nodes),
+        numberOfInputs(genotype.numberOfInputs),
+        numberOfOutputs(genotype.numberOfOutputs),
+        nodeCalculationOrder(topologicalSort(AdjList, nodes.size(), numberOfInputs)),
+        activationFunction(activationFunction)
     {
     }
 
     std::vector<double>  Phenotype::Predict(std::vector<double> input) const
     {
+        std::vector<double> nodeValues(nodes.size(), 0);
+        for (int i = 0; i < numberOfInputs; i++) {
+            nodeValues[i] = input[i];
+        }
+        for (int i : nodeCalculationOrder) {
+            if (nodes[i].nodeType != Node::INPUT)
+                nodeValues[i] = activationFunction(nodeValues[i]);
+            for (Link link : AdjList[i])
+                nodeValues[link.indexTo] += nodeValues[i] * link.weight;
+        }
+        return std::vector<double>(nodeValues.begin() + numberOfInputs, nodeValues.begin() + numberOfInputs + numberOfOutputs);
 
     }
 }

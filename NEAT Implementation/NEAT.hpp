@@ -31,6 +31,7 @@ namespace NEAT {
         uint numOfOutputsInNN;
         uint generationSize;
         std::uniform_int_distribution<uint> individualSelector;
+        ActivationFunction activationFunction = StandardActivationFunctions::Sigmoid;
 
         //Compatibility calculation Coefficients
         double compatibilityExcessCoefficient = 1.0;
@@ -100,7 +101,7 @@ namespace NEAT {
             //2.Calculate Fitness and Speciate
             for (Genome & genome : Generation)
             {
-                double genomeFitness = FitnessFunction(Phenotype(genome));  // calculate Fitness
+                double genomeFitness = FitnessFunction(Phenotype(genome, activationFunction));  // calculate Fitness
                 Individual individual(std::move(genome), genomeFitness);    // genome -> individual 
                 //Speciation
                 bool joinedSpecie = false;
