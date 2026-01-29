@@ -6,7 +6,7 @@
 #include "phenotype.hpp"
 #include "individual.hpp"
 #include "species.hpp"
-namespace NEAT {
+namespace bNEAT {
 
     class NEAT {
     private:
@@ -14,7 +14,7 @@ namespace NEAT {
         template<typename T> T & choose_within(std::vector<T> options);
 
         template<typename T> void CrossoverVector(const std::vector<T> & fitter, const std::vector<T> & lessFit, std::vector<T> & childVector, uint(*getId)(const T & v));
-    protected:
+    public:
         std::uniform_real_distribution<double> weightDistribution; //range of values weights can be
         std::uniform_real_distribution<double> nodeDistribution; //range of values nodes can have (what?)
         std::mt19937 rnd;
@@ -23,8 +23,8 @@ namespace NEAT {
         uint innovationCounter = 0;
 
         // maps used to keep track of innovation on a gennerational level so duplicate innovations get the same innovation number
-        std::map<Genome::Link, int> innovationTracker_AddedConnections;//[newLink]->newLinks inovation id
-        std::map<Genome::Link, int> innovationTracker_AddedNode;// [link that got replased]-> Id of the new node 
+        std::map<Genome::Link, uint> innovationTracker_AddedConnections;//[newLink]->newLinks inovation id
+        std::map<Genome::Link, uint> innovationTracker_AddedNode;// [link that got replased]-> Id of the new node 
         //ex: (1->4) :-> (1->6),(6->4):  AddedNode[(1->4)]=6,  AddedConnections[(1->6) or (6->4)] = it's innovation id
 
         uint numOfInputsInNN;
@@ -188,21 +188,26 @@ namespace NEAT {
         return (YesNoRange(rnd) ? A : B);
     }
     template<typename T> T & NEAT::choose_within(std::vector<T> options) {
-        std::uniform_int_distribution<uint> SelectionRange(0, options.size());
+        std::uniform_int_distribution<uint> SelectionRange(0, options.size() - 1);
         return options[SelectionRange(rnd)];
     }
-    template<typename T> void NEAT::CrossoverVector(const std::vector<T> & fitter, const std::vector<T> & lessFit, std::vector<T> & childVector, uint(*getId)(const T & v)) {
+    template<typename T> void NEAT::CrossoverVector(
+        const std::vector<T> & fitter,
+        const std::vector<T> & lessFit,
+        std::vector<T> & childVector,
+        uint(*getId)(const T & v))
+    {
         typename std::vector<T>::const_iterator i = fitter.begin(), j = lessFit.begin();
         while (i != fitter.end() && j != lessFit.end()) {
             if (getId(*i) == getId(*j)) {
-                childVector.connections.push_back(choose_between(*i, *j));
+                childVector.push_back(choose_between(*i, *j));
                 i++; j++;
             }
             else if (getId(*i) > getId(*j)) {
                 j++;
             }
             else {
-                childVector.connections.push_back(*i);
+                childVector.push_back(*i);
                 i++;
             }
         }
