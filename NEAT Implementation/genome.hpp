@@ -1,17 +1,19 @@
 #ifndef NEAT_LIBRARY_GENES_H
 #define NEAT_LIBRARY_GENES_H
-#include"includes.hpp"
+#include"phenotype.hpp"
 #include<stack>
 namespace NEAT {
+    struct Phenotype;
+    struct Node {
+        enum NodeType { INPUT, HIDDEN, OUTPUT };
+        uint id;
+        NodeType nodeType;
+        double bias;
+        Node(uint id = 0, double bias = 0.5, NodeType nodeType = HIDDEN) : id(id), nodeType(nodeType), bias(bias) {}
+    };
     struct Genome
     {
-        struct Node {
-            enum NodeType { INPUT, HIDDEN, OUTPUT };
-            uint id;
-            NodeType nodeType;
-            double bias;
-            Node(uint id = 0, double bias = 0.5, NodeType nodeType = HIDDEN) : id(id), nodeType(nodeType), bias(bias) {}
-        };
+
         struct Link {
             uint nodeInId;
             uint nodeOutId;
@@ -39,9 +41,9 @@ namespace NEAT {
             const std::vector<Connection> & connections = {});
 
         bool link_would_create_loop(const Link & newLink);
-        std::vector<std::vector<uint>> generateAdjList();
-        std::map<uint, uint> MapNodeIdToIndex();
-        uint NodeIdToIndex(uint NodeId);
+        std::vector<std::vector<Phenotype::Link>> generateAdjList() const;
+        std::map<uint, uint> MapNodeIdToIndex() const;
+        uint NodeIdToIndex(uint NodeId) const;
     };
 
 
@@ -63,7 +65,7 @@ namespace NEAT {
         }
     }
 
-    std::map<uint, uint> Genome::MapNodeIdToIndex()
+    std::map<uint, uint> Genome::MapNodeIdToIndex() const
     {
         std::map<uint, uint> reId;
         for (int i = 0; i < nodes.size(); i++)
@@ -71,55 +73,31 @@ namespace NEAT {
         return reId;
     }
 
-    uint Genome::NodeIdToIndex(uint NodeId)
+    uint Genome::NodeIdToIndex(uint NodeId) const
     {
         for (uint i = 0; i < nodes.size(); i++)
             if (NodeId == nodes[i].id)return i;
         return -1;
     }
 
-    std::vector<std::vector<uint>> Genome::generateAdjList()
+    std::vector < std::vector<Phenotype::Link>> Genome::generateAdjList() const
     {
-        std::vector<std::vector<uint>>rez(nodes.size(), std::vector <uint>());
+        std::vector<std::vector<Phenotype::Link>>rez(nodes.size(), std::vector <Phenotype::Link>());
         std::map<uint, uint> reId = MapNodeIdToIndex();
         for (const Connection & connection : connections)
-            rez[reId[connection.link.nodeInId]].push_back(reId[connection.link.nodeOutId]);
+            if (connection.isEnabled)
+                rez[reId[connection.link.nodeInId]].push_back({ reId[connection.link.nodeOutId],connection.weight });
         return rez;
     }
+
     bool Genome::link_would_create_loop(const Link & newLink)
     {
         uint From = NodeIdToIndex(newLink.nodeInId);
         uint To = NodeIdToIndex(newLink.nodeOutId);
         if (nodes[From].nodeType == Node::OUTPUT || nodes[To].nodeType == Node::INPUT)
             return true;
-        std::vector<std::vector<uint>> adjList = generateAdjList();
-
-        for (uint to : adjList[From])
-            if (to == To)
-                return true;
-        adjList[From].push_back(To);
-
-        std::vector<bool> visited(nodes.size(), false), inPathDefault(nodes.size(), false);
-        std::stack<std::pair<uint, std::vector<bool>>> Stack;
-        for (uint i = 0; i < numberOfInputs; i++)
-            Stack.push({ i,inPathDefault });
-        while (!Stack.empty())
-        {
-            uint curNode = Stack.top().first;
-            std::vector<bool> inPath = Stack.top().second;
-            Stack.pop();
-            visited[curNode] = true;
-            inPath[curNode] = true;
-
-            for (uint neighbour : adjList[curNode]) {
-                if (inPath[neighbour])
-                    return true;
-                if (!visited[neighbour]) {
-                    visited[neighbour] = true;
-                    Stack.push({ neighbour,inPath });
-                }
-            }
-        }
+        if (topologicalSort(generateAdjList(), nodes.size(), numberOfInputs).empty())
+            return true;
         return false;
     }
 
