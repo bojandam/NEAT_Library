@@ -2,7 +2,7 @@
 #define NEAT_LIBRARY_GENES_H
 #include"phenotype.hpp"
 #include<stack>
-namespace NEAT {
+namespace bNEAT {
     struct Phenotype;
     struct Node {
         enum NodeType { INPUT, HIDDEN, OUTPUT };
@@ -18,6 +18,9 @@ namespace NEAT {
             uint nodeInId;
             uint nodeOutId;
             Link(uint nodeInId = 0, uint nodeOutId = 0) :nodeInId(nodeInId), nodeOutId(nodeOutId) {}
+            bool operator<(const Link & other) const {
+                return (nodeInId < other.nodeInId || (nodeInId == other.nodeInId && nodeOutId < other.nodeOutId));
+            }
         };
         struct Connection {
             Link link;

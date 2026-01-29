@@ -2,7 +2,7 @@
 #define NEAT_LIBRARY_SPECIES_H
 
 #include"individual.hpp"
-namespace NEAT {
+namespace bNEAT {
     struct Species
     {
         Individual representitive;

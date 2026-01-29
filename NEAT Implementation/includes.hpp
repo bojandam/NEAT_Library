@@ -1,13 +1,13 @@
 #ifndef NEAT_LIBRARY_INCLUDES_H
 #define NEAT_LIBRARY_INCLUDES_H
 #include<vector>
-#include<set>
 #include<map>
 #include<cmath>
 #include<random>
 #include<algorithm>
+#include<stack>
 
-namespace NEAT {
+namespace bNEAT {
     namespace StandardActivationFunctions {
         double Sigmoid(double x) {
             return 1 / (1 + std::exp(-x));

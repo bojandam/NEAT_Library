@@ -1,7 +1,7 @@
 #ifndef NEAT_LIBRARY_INDIVIDUAL_H
 #define NEAT_LIBRARY_INDIVIDUAL_H
 #include "genome.hpp"
-namespace NEAT
+namespace bNEAT
 {
     struct Individual
     {

@@ -2,7 +2,7 @@
 #define NEAT_LIBRARY_PHENOTYPE_H
 #include"includes.hpp"
 
-namespace NEAT
+namespace bNEAT
 {
     struct Genome;
     struct Node;
