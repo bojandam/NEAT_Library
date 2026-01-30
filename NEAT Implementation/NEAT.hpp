@@ -15,8 +15,7 @@ namespace bNEAT {
 
         template<typename T> void CrossoverVector(const std::vector<T> & fitter, const std::vector<T> & lessFit, std::vector<T> & childVector, uint(*getId)(const T & v));
     public:
-        std::uniform_real_distribution<double> weightDistribution; //range of values weights can be
-        std::uniform_real_distribution<double> nodeDistribution; //range of values nodes can have (what?)
+        std::normal_distribution<double> weightDistribution; //range of values weights can be
         std::mt19937 rnd;
 
         uint nodeIdCounter;
@@ -43,6 +42,7 @@ namespace bNEAT {
         double compatibilityTreshold = 3.0;
 
         //Mutation Coefficients
+        double percentOf_MutateOnly_Children = 0.25;
         double weightMutation_PerWeight_Probability = 0.8;
         double biasMutation_PerNode_Probability = 0.8;
         double addNodeMutation_Probability = 0.5;
@@ -60,7 +60,7 @@ namespace bNEAT {
         void Mutate(Genome & child);
     public:
         NEAT(uint numOfInputsInNN, uint numOfOutputsInNN, uint generationSize = 1000) :
-            weightDistribution(-1, 1), nodeDistribution(0, 1), deltaNudgeDistribution(0, 0.1),
+            weightDistribution(0, 1.0), deltaNudgeDistribution(0, 0.1),
             numOfInputsInNN(numOfInputsInNN), numOfOutputsInNN(numOfOutputsInNN), generationSize(generationSize),
             rnd(std::random_device{}()),
             reproductionSelector(0, (int)((generationSize - 1) * selectionRate))
@@ -131,6 +131,14 @@ namespace bNEAT {
             std::sort(GenerationIndividuals.begin(), GenerationIndividuals.end(), [](Individual * a, Individual * b) {return *b < *a; });
             //4.Crossover & Mutation
             std::vector<Genome> NextGeneration;
+            while (NextGeneration.size() < generationSize * percentOf_MutateOnly_Children)
+            {
+                Individual * parent = GenerationIndividuals[reproductionSelector(rnd)];
+                Genome child(parent->genome);
+                Mutate(child);
+                NextGeneration.push_back(std::move(child));
+            }
+
             while (NextGeneration.size() < generationSize)
             {
                 Individual * parentA = GenerationIndividuals[reproductionSelector(rnd)];
@@ -271,7 +279,7 @@ namespace bNEAT {
 
     void NEAT::MutateWeightNudge(double & w)
     {
-        w = std::clamp<double>(w + std::clamp<double>(deltaNudgeDistribution(rnd), -mutationNudgeCap, mutationNudgeCap), weightDistribution.min(), weightDistribution.max());
+        w += std::clamp<double>(deltaNudgeDistribution(rnd), -mutationNudgeCap, mutationNudgeCap);
     }
 
     void NEAT::MutateWeightRandom(double & w)
