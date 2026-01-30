@@ -8,10 +8,17 @@ namespace bNEAT {
         Individual representitive;
         std::vector<Individual> members;
         int lifetime = 0;
+        double maxFitness = 0;
+        double prevMaxFitness = 0;
+        int lifetime_When_MaxFitness_Changed = 0;
+
+
+
         void PrepareForNextGeneration(int newRepresentativeIndex = 0) {
             if (!members.empty()) {
                 representitive = std::move(members[newRepresentativeIndex]);
                 members.clear();
+                lifetime++;
             }
         }
         Species(Individual && representitive) :representitive(representitive) {

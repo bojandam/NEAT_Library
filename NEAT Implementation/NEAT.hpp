@@ -6,14 +6,16 @@
 #include "phenotype.hpp"
 #include "individual.hpp"
 #include "species.hpp"
+#include <list>
 namespace bNEAT {
 
     class NEAT {
     private:
         template<typename T> T choose_between(T optionA, T optionB);
         template<typename T> T & choose_within(std::vector<T> & options);
-
         template<typename T> void CrossoverVector(const std::vector<T> & fitter, const std::vector<T> & lessFit, std::vector<T> & childVector, uint(*getId)(const T & v));
+        std::uniform_real_distribution<double> decider;
+        void MarkForDeath(std::vector<Species> & SpeciesTracker);
     public:
         std::normal_distribution<double> weightDistribution; //range of values weights can be
         std::mt19937 rnd;
@@ -32,7 +34,7 @@ namespace bNEAT {
         double selectionRate = 0.4;
         std::uniform_int_distribution<uint> reproductionSelector;
 
-        ActivationFunction activationFunction = StandardActivationFunctions::Sigmoid;
+        ActivationFunction activationFunction = StandardActivationFunctions::NEATSigmoid;
 
         //Compatibility calculation Coefficients
         double compatibilityExcessCoefficient = 1.0;
@@ -41,12 +43,15 @@ namespace bNEAT {
         uint compatibilityMinNThreshold = 20;
         double compatibilityTreshold = 3.0;
 
-        //Mutation Coefficients
+        //Crossover Coefficients
         double percentOf_MutateOnly_Children = 0.25;
+        double interSpicie_Crossover_Chance = 0.01;
+
+        //Mutation Coefficients        
         double weightMutation_PerWeight_Probability = 0.8;
         double biasMutation_PerNode_Probability = 0.8;
-        double addNodeMutation_Probability = 0.5;
-        double addConnectionMutation_Probability = 0.3;
+        double addNodeMutation_Probability = 0.2;
+        double addConnectionMutation_Probability = 0.4;
         double mutationRandomToNudgeRatio = 0.1;
         double mutationNudgeCap = 0.25;
         std::normal_distribution<double> deltaNudgeDistribution;
@@ -63,7 +68,8 @@ namespace bNEAT {
             weightDistribution(0, 1.0), deltaNudgeDistribution(0, 0.1),
             numOfInputsInNN(numOfInputsInNN), numOfOutputsInNN(numOfOutputsInNN), generationSize(generationSize),
             rnd(std::random_device{}()),
-            reproductionSelector(0, (int)((generationSize - 1) * selectionRate))
+            reproductionSelector(0, (int)((generationSize - 1) * selectionRate)),
+            decider(0, 1)
         {
             nodeIdCounter = numOfInputsInNN + numOfOutputsInNN;
         }
@@ -106,10 +112,10 @@ namespace bNEAT {
                 Individual individual(std::move(genome), genomeFitness);    // genome -> individual 
                 //Speciation
                 bool joinedSpecie = false;
-                for (int i = 0; i < SpeciesTracker.size(); i++) {
-                    if (CalculateCompatibility(individual.genome, SpeciesTracker[i].representitive.genome) < compatibilityTreshold) // check if individual fits in specie
+                for (Species & specie : SpeciesTracker) {
+                    if (CalculateCompatibility(individual.genome, specie.representitive.genome) < compatibilityTreshold) // check if individual fits in specie
                     {
-                        SpeciesTracker[i].members.push_back(std::move(individual)); // individuals get moved to spiciation tracker (/table/organiser) 
+                        specie.members.push_back(std::move(individual)); // individuals get moved to spiciation tracker (/table/organiser) 
                         joinedSpecie = true;
                         break;
                     }
@@ -120,29 +126,60 @@ namespace bNEAT {
                 GenerationFitness.push_back(genomeFitness);
             }
             Generation.clear();// just in case (since all genomes are now in Spicies tracker)
-            //3.Selection
-            std::vector<Individual * > GenerationIndividuals;
+            //3.Speciation
+
             for (Species & spicie : SpeciesTracker) {
                 for (Individual & individual : spicie.members) {
                     individual.fitness /= spicie.members.size(); //updated fitnes using speciation
-                    GenerationIndividuals.push_back(&individual);
+                    spicie.maxFitness = std::max(spicie.maxFitness, individual.fitness);
+                }
+                if (spicie.maxFitness != spicie.prevMaxFitness) {
+                    spicie.prevMaxFitness = spicie.maxFitness;
+                    spicie.lifetime_When_MaxFitness_Changed = spicie.lifetime;
                 }
             }
-            std::sort(GenerationIndividuals.begin(), GenerationIndividuals.end(), [](Individual * a, Individual * b) {return *b < *a; });
-            //4.Crossover & Mutation
+            //4.Selection
             std::vector<Genome> NextGeneration;
+
+            auto it = std::remove_if(
+                SpeciesTracker.begin(),
+                SpeciesTracker.end(),
+                [](const Species & x) {return x.lifetime - x.lifetime_When_MaxFitness_Changed >= 20; }
+            );
+            if (it != SpeciesTracker.begin() && it != SpeciesTracker.begin() + 1) {
+                SpeciesTracker.erase(it, SpeciesTracker.end());
+            }
+
+            MarkForDeath(SpeciesTracker);
+
+            for (Species & specie : SpeciesTracker) {
+                std::sort(specie.members.begin(), specie.members.end(), [](const Individual & a, const Individual & b) {return b < a; });
+                if (specie.members.size() > 5) {
+                    NextGeneration.push_back(specie.members[0].genome);
+                }
+                specie.members.erase(
+                    std::find_if(specie.members.begin(), specie.members.end(), [](const Individual & x) {return x.markedForDeath; }),
+                    specie.members.end()
+                );
+            }
+            SpeciesTracker.erase(
+                std::remove_if(SpeciesTracker.begin(), SpeciesTracker.end(), [](const Species & x) {return x.members.empty(); }),
+                SpeciesTracker.end());
+
+            //5.Crossover & Mutation
             while (NextGeneration.size() < generationSize * percentOf_MutateOnly_Children)
             {
-                Individual * parent = GenerationIndividuals[reproductionSelector(rnd)];
-                Genome child(parent->genome);
+                const Individual & parent = choose_within(choose_within(SpeciesTracker).members);
+                Genome child(parent.genome);
                 Mutate(child);
                 NextGeneration.push_back(std::move(child));
             }
 
-            while (NextGeneration.size() < generationSize)
+            while (NextGeneration.size() < generationSize)  //to do: make this seklect spicies
             {
-                Individual * parentA = GenerationIndividuals[reproductionSelector(rnd)];
-                Individual * parentB = GenerationIndividuals[reproductionSelector(rnd)];
+                Species & specie = choose_within(SpeciesTracker);
+                Individual * parentA = &choose_within(specie.members);
+                Individual * parentB = (decider(rnd) <= interSpicie_Crossover_Chance) ? &choose_within(choose_within(SpeciesTracker).members) : &choose_within(specie.members);
                 if (parentA != parentB) {
                     if (parentA->fitness < parentB->fitness)
                         std::swap(parentA, parentB);
@@ -151,15 +188,21 @@ namespace bNEAT {
                     NextGeneration.push_back(std::move(child));
                 }
             }
-            //Prepare for next Loop
+            //6.Prepare for next Loop
             Generation = std::move(NextGeneration);
             for (Species & specie : SpeciesTracker)
                 specie.PrepareForNextGeneration();
             itterationsFinished++;
         } while (!TermanateCondition(std::move(GenerationFitness), itterationsFinished));
-        //Termanation
+        //7.Termanation
         return Generation;
     }
+
+
+
+
+
+
 
 
     double NEAT::CalculateCompatibility(const Genome & A, const Genome & B) {
@@ -221,7 +264,17 @@ namespace bNEAT {
             }
         }
     }
-
+    void NEAT::MarkForDeath(std::vector<Species> & SpeciesTracker) {
+        std::vector<Individual * > GenerationIndividuals;
+        for (Species & spicie : SpeciesTracker) {
+            for (Individual & individual : spicie.members) {
+                GenerationIndividuals.push_back(&individual);
+            }
+        }
+        std::sort(GenerationIndividuals.begin(), GenerationIndividuals.end(), [](Individual * a, Individual * b) {return *b < *a; });
+        for (int i = GenerationIndividuals.size() * (1 - selectionRate); i < GenerationIndividuals.size(); i++)
+            GenerationIndividuals[i]->markedForDeath = true;
+    }
     Genome NEAT::Crossover(const Individual & fitter, const Individual & lessFit) {
         Genome child;
 
@@ -287,10 +340,7 @@ namespace bNEAT {
         w = weightDistribution(rnd);
     }
 
-    void NEAT::Mutate(Genome & child)
-    {
-        static std::uniform_real_distribution<double> decider(0, 1);
-
+    void NEAT::Mutate(Genome & child) {
         if (decider(rnd) <= addConnectionMutation_Probability)
             MutateAddConnection(child);
         if (decider(rnd) <= addNodeMutation_Probability)
