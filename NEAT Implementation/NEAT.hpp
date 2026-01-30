@@ -41,7 +41,7 @@ namespace bNEAT {
         double compatibilityDisjointCoefficient = 1.0;
         double compatibilityMatchingCoefficient = 0.4;
         uint compatibilityMinNThreshold = 20;
-        double compatibilityTreshold = 3.0;
+        double compatibilityTreshold = 2.0;
 
         //Crossover Coefficients
         double percentOf_MutateOnly_Children = 0.25;
@@ -130,8 +130,8 @@ namespace bNEAT {
 
             for (Species & spicie : SpeciesTracker) {
                 for (Individual & individual : spicie.members) {
-                    individual.fitness /= spicie.members.size(); //updated fitnes using speciation
                     spicie.maxFitness = std::max(spicie.maxFitness, individual.fitness);
+                    individual.fitness /= spicie.members.size(); //updated fitnes using speciation
                 }
                 if (spicie.maxFitness != spicie.prevMaxFitness) {
                     spicie.prevMaxFitness = spicie.maxFitness;
@@ -141,7 +141,7 @@ namespace bNEAT {
             //4.Selection
             std::vector<Genome> NextGeneration;
 
-            auto it = std::remove_if(
+            auto it = std::stable_partition(
                 SpeciesTracker.begin(),
                 SpeciesTracker.end(),
                 [](const Species & x) {return x.lifetime - x.lifetime_When_MaxFitness_Changed >= 20; }
