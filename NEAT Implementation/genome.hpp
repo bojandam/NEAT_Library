@@ -21,6 +21,9 @@ namespace bNEAT {
             bool operator<(const Link & other) const {
                 return (nodeInId < other.nodeInId || (nodeInId == other.nodeInId && nodeOutId < other.nodeOutId));
             }
+            bool operator==(const Link & other) const {
+                return nodeInId == other.nodeInId && nodeOutId == other.nodeOutId;
+            }
         };
         struct Connection {
             Link link;

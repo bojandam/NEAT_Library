@@ -323,6 +323,8 @@ namespace bNEAT {
         Node & fromNode = choose_within(child.nodes);
         Node & toNode = choose_within(child.nodes);
         Genome::Link newLink(fromNode.id, toNode.id);
+        if (std::find_if(child.connections.begin(), child.connections.end(), [newLink](const Genome::Connection & conn) {return conn.link == newLink; }) != child.connections.end())
+            return;
         if (child.link_would_create_loop(newLink))
             return;
         if (innovationTracker_AddedConnections.find(newLink) == innovationTracker_AddedConnections.end())
