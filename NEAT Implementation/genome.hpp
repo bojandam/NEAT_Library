@@ -40,7 +40,7 @@ namespace bNEAT {
         Genome() = default;
         Genome(uint numberOfInputs,
             uint numberOfOutputs,
-            std::uniform_real_distribution<double> & biasDistribution,
+            std::normal_distribution<double> & biasDistribution,
             std::mt19937 & rnd,
             const std::vector<Connection> & connections = {});
         Genome(const Genome &) = default;
@@ -55,7 +55,7 @@ namespace bNEAT {
     };
 
 
-    Genome::Genome(uint numberOfInputs, uint numberOfOutputs, std::uniform_real_distribution<double> & biasDistribution,
+    Genome::Genome(uint numberOfInputs, uint numberOfOutputs, std::normal_distribution<double> & biasDistribution,
         std::mt19937 & rnd, const std::vector<Connection> & connections)
         : numberOfInputs(numberOfInputs), numberOfOutputs(numberOfOutputs)
     {
