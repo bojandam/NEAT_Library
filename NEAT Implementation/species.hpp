@@ -9,8 +9,10 @@ namespace bNEAT {
         std::vector<Individual> members;
         int lifetime = 0;
         void PrepareForNextGeneration(int newRepresentativeIndex = 0) {
-            representitive = std::move(members[newRepresentativeIndex]);
-            members.clear();
+            if (!members.empty()) {
+                representitive = std::move(members[newRepresentativeIndex]);
+                members.clear();
+            }
         }
         Species(Individual && representitive) :representitive(representitive) {
             members.push_back(this->representitive);

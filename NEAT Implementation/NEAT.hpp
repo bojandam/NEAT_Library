@@ -11,7 +11,7 @@ namespace bNEAT {
     class NEAT {
     private:
         template<typename T> T choose_between(T optionA, T optionB);
-        template<typename T> T & choose_within(std::vector<T> options);
+        template<typename T> T & choose_within(std::vector<T> & options);
 
         template<typename T> void CrossoverVector(const std::vector<T> & fitter, const std::vector<T> & lessFit, std::vector<T> & childVector, uint(*getId)(const T & v));
     public:
@@ -30,7 +30,9 @@ namespace bNEAT {
         uint numOfInputsInNN;
         uint numOfOutputsInNN;
         uint generationSize;
-        std::uniform_int_distribution<uint> individualSelector;
+        double selectionRate = 0.4;
+        std::uniform_int_distribution<uint> reproductionSelector;
+
         ActivationFunction activationFunction = StandardActivationFunctions::Sigmoid;
 
         //Compatibility calculation Coefficients
@@ -41,11 +43,11 @@ namespace bNEAT {
         double compatibilityTreshold = 3.0;
 
         //Mutation Coefficients
-        double weightMutation_PerWeight_Probability = 0.03;
-        double biasMutation_PerNode_Probability = 0.03;
-        double addNodeMutation_Probability = 0.1;
-        double addConnectionMutation_Probability = 0.1;
-        double mutationRandomToNudgeRatio = 0.5;
+        double weightMutation_PerWeight_Probability = 0.8;
+        double biasMutation_PerNode_Probability = 0.8;
+        double addNodeMutation_Probability = 0.5;
+        double addConnectionMutation_Probability = 0.3;
+        double mutationRandomToNudgeRatio = 0.1;
         double mutationNudgeCap = 0.25;
         std::normal_distribution<double> deltaNudgeDistribution;
 
@@ -58,15 +60,15 @@ namespace bNEAT {
         void Mutate(Genome & child);
     public:
         NEAT(uint numOfInputsInNN, uint numOfOutputsInNN, uint generationSize = 1000) :
-            weightDistribution(-1, 1), nodeDistribution(0, 1), deltaNudgeDistribution(),
+            weightDistribution(-1, 1), nodeDistribution(0, 1), deltaNudgeDistribution(0, 0.1),
             numOfInputsInNN(numOfInputsInNN), numOfOutputsInNN(numOfOutputsInNN), generationSize(generationSize),
-            rnd(std::random_device{}()), individualSelector(0, generationSize - 1)
+            rnd(std::random_device{}()),
+            reproductionSelector(0, (int)((generationSize - 1) * selectionRate))
         {
             nodeIdCounter = numOfInputsInNN + numOfOutputsInNN;
         }
         std::vector<Genome>  RunAlgorithm(double (*FitnessFunction)(const Phenotype &),
-            bool (*TermanateCondition)(const std::vector<double> & GenerationFitness, uint IterationsFinished),
-            double selectionRate,
+            bool (*TermanateCondition)(std::vector<double>   GenerationFitness, uint IterationsFinished),
             const std::vector<Genome::Link> & StarterLinks = {});
 
 
@@ -78,8 +80,7 @@ namespace bNEAT {
 
     std::vector<Genome> NEAT::RunAlgorithm(
         double (*FitnessFunction)(const Phenotype &),
-        bool (*TermanateCondition)(const std::vector<double> & GenerationFitness, uint IterationsFinished),
-        double selectionRate,
+        bool (*TermanateCondition)(std::vector<double> GenerationFitness, uint IterationsFinished),
         const std::vector<Genome::Link> & StarterLinks)
     {
         //1.Initalization
@@ -105,10 +106,10 @@ namespace bNEAT {
                 Individual individual(std::move(genome), genomeFitness);    // genome -> individual 
                 //Speciation
                 bool joinedSpecie = false;
-                for (Species & specie : SpeciesTracker) {
-                    if (CalculateCompatibility(individual.genome, specie.representitive.genome) < compatibilityTreshold) // check if individual fits in specie
+                for (int i = 0; i < SpeciesTracker.size(); i++) {
+                    if (CalculateCompatibility(individual.genome, SpeciesTracker[i].representitive.genome) < compatibilityTreshold) // check if individual fits in specie
                     {
-                        specie.members.push_back(std::move(individual)); // individuals get moved to spiciation tracker (/table/organiser) 
+                        SpeciesTracker[i].members.push_back(std::move(individual)); // individuals get moved to spiciation tracker (/table/organiser) 
                         joinedSpecie = true;
                         break;
                     }
@@ -127,13 +128,13 @@ namespace bNEAT {
                     GenerationIndividuals.push_back(&individual);
                 }
             }
-            std::sort(GenerationIndividuals.begin(), GenerationIndividuals.end(), [](Individual * a, Individual * b) {return *a < *b; });
+            std::sort(GenerationIndividuals.begin(), GenerationIndividuals.end(), [](Individual * a, Individual * b) {return *b < *a; });
             //4.Crossover & Mutation
             std::vector<Genome> NextGeneration;
             while (NextGeneration.size() < generationSize)
             {
-                Individual * parentA = GenerationIndividuals[individualSelector(rnd)];
-                Individual * parentB = GenerationIndividuals[individualSelector(rnd)];
+                Individual * parentA = GenerationIndividuals[reproductionSelector(rnd)];
+                Individual * parentB = GenerationIndividuals[reproductionSelector(rnd)];
                 if (parentA != parentB) {
                     if (parentA->fitness < parentB->fitness)
                         std::swap(parentA, parentB);
@@ -147,7 +148,7 @@ namespace bNEAT {
             for (Species & specie : SpeciesTracker)
                 specie.PrepareForNextGeneration();
             itterationsFinished++;
-        } while (!TermanateCondition(GenerationFitness, itterationsFinished));
+        } while (!TermanateCondition(std::move(GenerationFitness), itterationsFinished));
         //Termanation
         return Generation;
     }
@@ -187,7 +188,7 @@ namespace bNEAT {
         static std::uniform_int_distribution<int> YesNoRange(0, 1);
         return (YesNoRange(rnd) ? A : B);
     }
-    template<typename T> T & NEAT::choose_within(std::vector<T> options) {
+    template<typename T> T & NEAT::choose_within(std::vector<T> & options) {
         std::uniform_int_distribution<uint> SelectionRange(0, options.size() - 1);
         return options[SelectionRange(rnd)];
     }
@@ -214,7 +215,7 @@ namespace bNEAT {
     }
 
     Genome NEAT::Crossover(const Individual & fitter, const Individual & lessFit) {
-        Genome child(numOfInputsInNN, numOfOutputsInNN, weightDistribution, rnd);
+        Genome child;
 
         CrossoverVector<Genome::Connection>(
             fitter.genome.connections,
@@ -253,8 +254,8 @@ namespace bNEAT {
 
         oldConnection.isEnabled = false;
         child.nodes.push_back(Node(NodeId, weightDistribution(rnd)));
+        child.connections.push_back(new_connection_To);//order matters
         child.connections.push_back(new_connection_From);
-        child.connections.push_back(new_connection_To);
     }
 
     void NEAT::MutateAddConnection(Genome & child) {
@@ -285,7 +286,7 @@ namespace bNEAT {
         if (decider(rnd) <= addConnectionMutation_Probability)
             MutateAddConnection(child);
         if (decider(rnd) <= addNodeMutation_Probability)
-            MutateAddConnection(child);
+            MutateAddNode(child);
         for (Node & node : child.nodes) {
             if (decider(rnd) <= biasMutation_PerNode_Probability)
                 (decider(rnd) <= mutationRandomToNudgeRatio) ? MutateWeightRandom(node.bias) : MutateWeightNudge(node.bias);

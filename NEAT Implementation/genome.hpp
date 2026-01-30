@@ -37,11 +37,16 @@ namespace bNEAT {
         uint numberOfInputs;
         uint numberOfOutputs;
 
+        Genome() = default;
         Genome(uint numberOfInputs,
             uint numberOfOutputs,
             std::uniform_real_distribution<double> & biasDistribution,
             std::mt19937 & rnd,
             const std::vector<Connection> & connections = {});
+        Genome(const Genome &) = default;
+        Genome(Genome &&) = default;
+        Genome & operator=(const Genome &) = default;
+
 
         bool link_would_create_loop(const Link & newLink);
         std::vector<std::vector<Phenotype::Link>> generateAdjList() const;
@@ -97,9 +102,12 @@ namespace bNEAT {
     {
         uint From = NodeIdToIndex(newLink.nodeInId);
         uint To = NodeIdToIndex(newLink.nodeOutId);
+        std::vector<std::vector<bNEAT::Phenotype::Link>> adjList(generateAdjList());
+
         if (nodes[From].nodeType == Node::OUTPUT || nodes[To].nodeType == Node::INPUT)
             return true;
-        if (topologicalSort(generateAdjList(), nodes.size(), numberOfInputs).empty())
+        adjList[From].push_back({ To,0 });
+        if (topologicalSort(adjList, nodes.size(), numberOfInputs).empty())
             return true;
         return false;
     }

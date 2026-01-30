@@ -7,7 +7,7 @@ namespace bNEAT
     {
         Genome genome;
         double fitness;
-        Individual(Genome && genome, const double & fitness) :genome(genome), fitness(fitness) {}
+        Individual(Genome && genome, const double & fitness) :genome(std::move(genome)), fitness(fitness) {}
         bool operator<(const Individual & other) {
             return this->fitness < other.fitness;
         }

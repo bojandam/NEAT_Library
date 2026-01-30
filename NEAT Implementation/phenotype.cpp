@@ -1,6 +1,6 @@
 #include "phenotype.hpp"
 #include "genome.hpp"
-namespace NEAT {
+namespace bNEAT {
 
     std::vector<uint> topologicalSort(const std::vector<std::vector<Phenotype::Link>> & AdjList, uint nodeSize, uint numberOfInputs) {
         std::vector<bool> visited(nodeSize, false), finished(nodeSize, false);
@@ -53,7 +53,7 @@ namespace NEAT {
         }
         for (int i : nodeCalculationOrder) {
             if (nodes[i].nodeType != Node::INPUT)
-                nodeValues[i] = activationFunction(nodeValues[i]);
+                nodeValues[i] = activationFunction(nodeValues[i] + nodes[i].bias);
             for (Link link : AdjList[i])
                 nodeValues[link.indexTo] += nodeValues[i] * link.weight;
         }
@@ -61,3 +61,4 @@ namespace NEAT {
 
     }
 }
+
