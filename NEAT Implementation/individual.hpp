@@ -12,6 +12,9 @@ namespace bNEAT
         bool operator<(const Individual & other) const {
             return this->fitness < other.fitness;
         }
+        bool operator>(const Individual & other) const {
+            return this->fitness > other.fitness;
+        }
     };
 
 

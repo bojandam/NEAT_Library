@@ -9,12 +9,8 @@
 
 namespace bNEAT {
     namespace StandardActivationFunctions {
-        double Sigmoid(double x) {
-            return 1 / (1 + std::exp(-x));
-        }
-        double NEATSigmoid(double x) {
-            return 1 / (1 + std::exp(-4.9 * x));
-        }
+        double Sigmoid(double x);
+        double NEATSigmoid(double x);
     }
     typedef double (*ActivationFunction) (double);
     typedef unsigned int uint;
