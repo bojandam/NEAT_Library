@@ -3,4 +3,6 @@ This repository is my implementation of the NEAT algorithm, a Neuroevolution AI 
 
 Neuroevolution is a topic that interest me, I have made simple neuroevolution projects in the past. I recently revisited the last one, which was an attempt to make the AI train on eachouther in a tournament like sysyem, and was inspired to take the next step, which I tought was implementing a more serious algorithm, like NEAT.
 
-Development has slowed down due to my focus on my studies.
+The original [NEAT paper](https://nn.cs.utexas.edu/downloads/papers/stanley.ec02.pdf)
+
+Development has slowed down due to my focus on my studies. 
