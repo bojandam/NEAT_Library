@@ -11,6 +11,7 @@ namespace bNEAT {
     namespace StandardActivationFunctions {
         double Sigmoid(double x);
         double NEATSigmoid(double x);
+        double SoftPlus(double x);
     }
     typedef double (*ActivationFunction) (double);
     typedef unsigned int uint;

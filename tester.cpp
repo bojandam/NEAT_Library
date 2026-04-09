@@ -61,6 +61,7 @@ int main()
     // }
 
     NEAT algorithm(1, 1, 150);
+    algorithm.activationFunction = bNEAT::StandardActivationFunctions::SoftPlus;
     std::vector<Individual> rez = algorithm.RunAlgorithm(FitnessSqr, TerminateSqr);
     Phenotype agent(rez[0].genome, algorithm.activationFunction);
     cout << "---------------\n";
